@@ -1,0 +1,20 @@
+Create table DRIVER(
+   	Driver_Id  varchar(10)  not null,
+   	Driver_Name  varchar(35)  not null,
+   	Driver_License_Number  varchar(30)  not null,
+   	Driver_Email  varchar(31) not null,
+	Driver_Contact  varchar(15)  not null,
+	Driver_Status  varchar(10) DEFAULT 'WORKING',
+Primary key(Driver_Id),
+Constraint chk_Driver_Name_Length check (length(Driver_Name) > 0),
+Constraint uniq_Driver_License_Number unique (Driver_License_Number),
+Constraint chk_Driver_Email check(
+REGEXP_LIKE(Driver_Email,'^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$')
+),   
+CONSTRAINT chk_Driver_Contact CHECK( 
+  REGEXP_LIKE(Driver_Contact, '^601[0-9]-[0-9]{6,7}$')
+),
+Constraint chk_Driver_Status check(
+upper(Driver_Status) in ('WORKING', 'OFFLINE', 'ON_LEAVE')
+)
+);  
