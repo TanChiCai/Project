@@ -1,0 +1,10 @@
+Create table BUS_STOP(
+   	Bus_Stop_Id	 varchar(10)  not null,
+	Bus_Stop_Name  varchar(35)  not null,
+	Address  varchar(55)  not null,
+   	Stop_Sequence  number(2)  not null,
+   	Booking_Id  varchar(10) not null,
+Primary key(Bus_Stop_Id),
+Foreign key(Booking_Id) references BOOKING(Booking_Id),
+Constraint chk_stop_sequence check (Stop_Sequence > 0)
+);

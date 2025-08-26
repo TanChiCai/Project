@@ -1,0 +1,31 @@
+CLEAR COLUMNS
+CLEAR BREAKS
+CLEAR COMPUTES
+TTITLE OFF
+
+ALTER SESSION SET NLS_DATE_FORMAT = 'DD-MON-YYYY';
+set linesize 10000;
+column 'Total Payment (RM)' format 000000.00;
+COLUMN School_Name HEADING School
+COLUMN School_Address HEADING "School Address"
+
+CL SCR
+
+ACCEPT p_time CHAR PROMPT 'Enter month-Year (e.g., MON-YYYY) or Year(e.g.YYYY): ';
+
+TTITLE '                                                                       Top 5 Schools Based on Total Payment Value ' '&p_time' ' REPORT 'SKIP 2;
+
+SELECT Rank,School_Name,School_Address,"Total Bookings Made","Booking Days","Number Of People","Total Number of Buses Assigned","Total Payment (RM)" 
+FROM (SELECT ROW_NUMBER() OVER (ORDER BY SUM(P.Payment_Amount) DESC) AS Rank,S.School_Name,S.School_Address,COUNT(*) AS "Total Bookings Made" ,SUM(B.Booking_Days) AS "Booking Days", SUM(B.Number_Of_People) AS "Number Of People", SUM(B.Number_Buses_Assigned) AS "Total Number of Buses Assigned",SUM(P.Payment_Amount) AS "Total Payment (RM)"
+FROM BOOKING B JOIN PAYMENT P ON B.Booking_ID = P.Booking_ID  JOIN SCHOOL S ON S.School_ID = B.School_ID
+WHERE P.Payment_Status='Completed' and (TO_CHAR(P.Payment_Date, 'MON-YYYY') = upper('&p_time') OR TO_CHAR(P.Payment_Date, 'YYYY') = upper('&p_time'))
+GROUP BY S.School_Name,S.School_Address 
+ORDER BY "Total Payment (RM)" DESC)
+WHERE Rank<= 5 ;
+
+
+
+CLEAR COLUMNS
+CLEAR BREAKS
+CLEAR COMPUTES
+TTITLE OFF

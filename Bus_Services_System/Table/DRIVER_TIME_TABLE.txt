@@ -1,0 +1,12 @@
+Create table DRIVER_TIME_TABLE(
+	Driver_Time_Table_Id  varchar(10)  not null, 
+	Estimated_Arrival  varchar(5)  not null,
+	Estimated_Departure  varchar(5)  not null,
+	Driver_Id  varchar(10)  not null,
+	Bus_Id  varchar(10)  not null,
+	Booking_Id  varchar(10)  not null,
+Primary key(Driver_Time_Table_Id),
+Foreign key(Driver_Id) references DRIVER(Driver_Id),
+Foreign key(Bus_Id) references BUS(Bus_Id),
+Foreign key(Booking_Id) references BOOKING(Booking_Id)
+);
