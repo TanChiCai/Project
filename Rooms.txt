@@ -1,0 +1,6 @@
+RoomID,roomName,maxCapacity,equipments
+RD01,Discussion Room,4,
+RD02,Discussion Room,4,
+RD03,Discussion Room,4,
+RC01,Conference Room,30,"Projector;Whiteboard;Microphone"
+RC02,Conference Room,30,"Projector;Whiteboard;Microphone"

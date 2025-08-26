@@ -1,0 +1,1 @@
+ReservationID,userID,roomID,reservationDate,startTime,endTime,noOfPax,equipments,status
