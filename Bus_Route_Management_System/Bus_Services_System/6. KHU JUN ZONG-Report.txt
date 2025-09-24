@@ -1,0 +1,39 @@
+CLEAR COLUMNS
+CLEAR BREAKS
+CLEAR COMPUTES
+TTITLE OFF
+
+ALTER SESSION SET NLS_DATE_FORMAT = 'DD-MON-YY';
+SET LINESIZE 200
+SET PAGESIZE 200
+COLUMN Booking_Id FORMAT A10;
+COLUMN Booking_Start_Date FORMAT A18;
+COLUMN Booking_End_Date FORMAT A16;
+COLUMN PAYMENT_STATUS FORMAT A15
+COLUMN Driver_Id FORMAT A12
+COLUMN Driver_Name FORMAT A30
+COLUMN Bus_Id FORMAT A12
+COLUMN License_Plate A8
+COLUMN School_Name FORMAT A35
+
+
+CL SCR
+
+ACCEPT p_school_id CHAR PROMPT ‘School Id : ’ ;
+TTITLE
+‘Booking Information Report By School’;
+
+SELECT BK.Booking_Id , BK.Booking_Start_Date ,  BK.Booking_End_Date , P.Payment_Status , D.Driver_Name , D.Driver_Id , B.License_Plate , S.School_Name
+FROM Booking BK
+JOIN Payment P ON BK.Booking_Id = P.Booking_Id
+JOIN Driver_Time_Table DTT ON BK.Booking_Id = DTT.Booking_Id
+JOIN Driver D ON DTT.Driver_Id = D.Driver_Id
+JOIN BUS B ON DTT.Bus_Id = B.Bus_Id
+JOIN SCHOOL S ON BK.School_Id = S.School_Id
+WHERE S.School_Id = UPPER('&p_school_id')
+ORDER BY BK.Booking_Start_Date ;
+
+CLEAR COLUMNS
+CLEAR BREAKS
+CLEAR COMPUTES
+TTITLE OFF

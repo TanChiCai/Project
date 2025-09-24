@@ -1,0 +1,25 @@
+CLEAR COLUMNS
+CLEAR BREAKS
+CLEAR COMPUTES
+TTITLE OFF
+
+SET LINESIZE 200
+SET PAGESIZE 120
+column "Bus ID" format a8 
+column "Bus Type" format a10 
+column "Capacity" format a10 
+column "Capacity" format 9999 
+column "Price (RM)" format a11 
+column "Price (RM)" format 99990.99 
+column "License Plate" format a13 
+column "Expiry Date" format a15 
+column "Maintenance Status" format a18
+
+select b.bus_id as "Bus ID", t.bus_type as "Bus Type", t.capacity as "Capacity", t.bus_type_price as "Price (RM)", b.License_Plate as "License Plate", b.Road_Tax_Expiry_date as "Expiry Date", b.Maintenance_Status as "Maintenance Status"
+from bus_type t join bus b on t.Bus_Type_Id = b.Bus_Type_Id;
+
+CLEAR COLUMNS
+CLEAR BREAKS
+CLEAR COMPUTES
+TTITLE OFF
+

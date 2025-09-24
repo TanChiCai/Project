@@ -1,0 +1,26 @@
+Create table BOOKING(
+Booking_Id  varchar(9)  not null,
+Booking_Days  number(2)  not null,
+Booking_Start_Date  date,
+Booking_End_Date  date,
+Booking_Start_Time  varchar(5),
+Booking_End_Time  varchar(5),
+Destination  varchar(45),
+Number_Of_People  number(4)  not null, 
+Type_Of_Bus_Selected  varchar(8)  not null,
+Number_Buses_Assigned  varchar(2)  DEFAULT 1,
+Booking_Price  number(7,2),
+Booking_Comment  varchar(75),
+Booking_Made_Date date,
+Booking_Made_Time varchar(5),
+School_Id  varchar(10),
+Route_Id  varchar(10),
+Primary key(Booking_id),
+Foreign key(School_id) references school(School_id),
+Foreign key(Route_id) references route(Route_id),
+Constraint chk_Bus_Type_Selected check(
+upper(Type_Of_Bus_Selected) in ('STANDARD','DELUXE','CHARTER')
+),
+Constraint chk_Number_Of_People check (Number_Of_People > 0),
+Constraint chk_Buses_assigned check (Number_Buses_Assigned > 0)
+);

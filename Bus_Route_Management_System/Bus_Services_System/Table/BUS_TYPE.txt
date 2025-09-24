@@ -1,0 +1,11 @@
+Create table BUS_TYPE(
+Bus_Type_Id  varchar(10)  not null,
+Bus_Type  varchar(10)  not null,
+Model  varchar(25) not null,
+Capacity  number(4) not null,
+Bus_Type_Price  number(7,2) not null,
+Primary key(Bus_Type_Id),
+CONSTRAINT chk_bus_type CHECK (UPPER(Bus_Type) IN ('STANDARD', 'DELUXE', 'CHARTER')),
+Constraint chk_capacity check (Capacity > 0)
+);
+

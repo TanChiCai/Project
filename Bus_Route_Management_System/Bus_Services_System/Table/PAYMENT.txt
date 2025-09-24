@@ -1,0 +1,19 @@
+Create table PAYMENT(
+   	Payment_Id  varchar(10)  not null,
+   	Payment_Method  varchar(30)  DEFAULT '-',
+	Payment_Type    varchar(15)  not null,
+   	Payment_Amount  number(7,2)  not null,
+   	Payment_Date  date,
+	Payment_Dead_Line date not null,
+   	Payment_Status  varchar(20)  DEFAULT 'Pending',
+	Booking_Id  varchar(10)  not null,
+Primary key(Payment_Id),
+Constraint chk_payment_type check (
+upper(Payment_Type) in ('DEPOSIT', 'FULL_PAYMENT')
+),
+Foreign key(Booking_Id) references BOOKING(Booking_Id),
+Constraint chk_payment_amount check (Payment_Amount > 0),
+Constraint chk_payment_status check (
+upper(Payment_Status) in ('PENDING', 'COMPLETED', 'FAILED')
+)
+);

@@ -1,0 +1,37 @@
+CLEAR COLUMNS
+CLEAR BREAKS
+CLEAR COMPUTES
+TTITLE OFF
+
+SET LINESIZE 300
+SET PAGESIZE 350
+COLUMN Booking_Id FORMAT 'A10'
+COLUMN Booking_Start_Date FORMAT 'A18'
+COLUMN Booking_Start_Time FORMAT 'A18'
+COLUMN Booking_End_Date FORMAT 'A16'
+COLUMN Booking_End_Time FORMAT 'A16'
+COLUMN Driver_Contact FORMAT 'A14'
+COLUMN License_Plate FORMAT 'A13'
+COLUMN Bus_Type FORMAT 'A8'
+CL SCR
+
+ACCEPT from_date CHAR PROMPT 'Enter booking from date (DD/MM/YYYY): ';
+ACCEPT to_date CHAR PROMPT 'Enter booking to date (DD/MM/YYYY): ';
+
+TTITLE '                                                  Driver and Bus Assignment Report - Search from ' '&from_date' ' to ' '&to_date' SKIP 2;
+
+SELECT b.booking_id, b.booking_start_date, b.booking_start_time, b.booking_end_date, b.booking_end_time, d.driver_name, d.driver_contact,
+bs.license_plate, bt.bus_type
+FROM booking b
+LEFT JOIN driver_time_table t ON b.booking_id = t.booking_id
+LEFT JOIN driver d on d.driver_id = t.driver_id
+LEFT JOIN bus bs on bs.bus_id = t.bus_id
+LEFT JOIN bus_type bt on bt.bus_type_id = bs.bus_type_id
+WHERE (b.booking_start_date BETWEEN TO_DATE('&from_date', 'DD/MM/YYYY') AND TO_DATE('&to_date', 'DD/MM/YYYY'))
+or  (b.booking_end_date BETWEEN TO_DATE('&from_date', 'DD/MM/YYYY') AND TO_DATE('&to_date', 'DD/MM/YYYY'))
+order by  b.booking_start_date, b.booking_start_time;
+
+CLEAR COLUMNS
+CLEAR BREAKS
+CLEAR COMPUTES
+TTITLE OFF
