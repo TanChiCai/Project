@@ -1,0 +1,257 @@
+package com.example.stayeasehotel.ui.viewmodel
+
+import android.os.Build
+import android.util.Log
+import androidx.annotation.RequiresApi
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.stayeasehotel.ui.navigation.CardFieldError
+import com.example.stayeasehotel.ui.navigation.PaymentOption
+import com.example.stayeasehotel.ui.uiState.BookingUiState
+import com.example.stayeasehotel.ui.uiState.HotelRoomUiState
+import com.example.stayeasehotel.data.roomDatabase.PaymentEntity
+import com.example.stayeasehotel.data.roomDatabase.ReservationEntity
+import com.example.stayeasehotel.domain.BookingUseCase
+import com.example.stayeasehotel.data.UserEntity
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
+import java.time.Instant
+import java.time.LocalDate
+import java.time.ZoneId
+import java.time.temporal.ChronoUnit
+import java.util.Date
+import java.util.Locale
+
+class BookingViewModel(
+    private val bookingUseCase: BookingUseCase
+): ViewModel() {
+    private val _uiState = MutableStateFlow(BookingUiState())
+    val uiState: StateFlow<BookingUiState> = _uiState.asStateFlow()
+
+    private val _isLoading = MutableStateFlow(false)
+    val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
+
+    private val _userBookings = MutableStateFlow<List<Pair<ReservationEntity, PaymentEntity>>>(emptyList())
+    val userBookings: StateFlow<List<Pair<ReservationEntity, PaymentEntity>>> = _userBookings
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun setDates(
+        startDate: Long?,
+        endDate: Long?
+    ) {
+        _uiState.value = _uiState.value.copy(
+            checkInDate = startDate,
+            checkOutDate = endDate
+        )
+    }
+
+    fun setUserData(userData: UserEntity) {
+        _uiState.value = _uiState.value.copy(
+            userName = userData.name,
+            userEmail = userData.email,
+            userPhone = userData.phoneNum
+        )
+    }
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun setSelectedRoom(room: HotelRoomUiState) {
+        _uiState.value = _uiState.value.copy(selectedRoom = room)
+        calculateTotalPrice()
+    }
+
+    fun increaseRoomCount() {
+        if (_uiState.value.roomCount < 10) {
+            _uiState.value = _uiState.value.copy(
+                roomCount = _uiState.value.roomCount + 1
+            )
+        }
+    }
+
+    fun decreaseRoomCount() {
+        if (_uiState.value.roomCount > 1) {
+            _uiState.value = _uiState.value.copy(
+                roomCount = _uiState.value.roomCount - 1
+            )
+        }
+    }
+
+    fun checkRoomAvailability(
+        room: HotelRoomUiState,
+        onResult: (Boolean, Int) -> Unit
+    ) {
+        val checkIn = _uiState.value.checkInDate
+        val checkOut = _uiState.value.checkOutDate
+
+        _isLoading.value = true
+        bookingUseCase.checkRoomAvailability(room, checkIn, checkOut) { isAvailable, availableCount ->
+            _isLoading.value = false
+            onResult(isAvailable, availableCount)
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    private fun Long.toLocalDate(): LocalDate =
+        Instant.ofEpochMilli(this).atZone(ZoneId.systemDefault()).toLocalDate()
+
+    // Rules for selecting dates
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun isDateSelectable(utcMillis: Long): Boolean {
+        val today = LocalDate.now()
+        val oneYearLater = today.plusYears(1)
+        val date = utcMillis.toLocalDate()
+
+        // Rule 1: Only future dates (today + 1 day or later)
+        if (date.isBefore(today)) return false
+
+        // Rule 2: Max 1 year ahead
+        if (date.isAfter(oneYearLater)) return false
+
+        // Rule 3: If check-in date is chosen, only allow 20-day range
+        _uiState.value.checkInDate?.let {
+            val checkIn = it.toLocalDate()
+            val latestAllowed = checkIn.plusDays(20)
+
+            if (!date.isBefore(checkIn) && date.isAfter(latestAllowed)) return false
+
+            // Rule 4: check-out must be at least 1 day after check-in
+            if (date.isEqual(checkIn)) return false
+        }
+
+        return true
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O)
+    fun calculateTotalPrice() {
+        val room = _uiState.value.selectedRoom
+        val checkIn = _uiState.value.checkInDate
+        val checkOut = _uiState.value.checkOutDate
+        val roomCount = _uiState.value.roomCount
+
+        if (room != null && checkIn != null && checkOut != null) {
+            val checkInDate = checkIn.toLocalDate()
+            val checkOutDate = checkOut.toLocalDate()
+
+            // Nights stayed (e.g., 2 days → 2 nights)
+            val nights = ChronoUnit.DAYS.between(
+                Instant.ofEpochMilli(checkIn).atZone(ZoneId.systemDefault()).toLocalDate(),
+                Instant.ofEpochMilli(checkOut).atZone(ZoneId.systemDefault()).toLocalDate()
+            ).toInt()
+            _uiState.value = _uiState.value.copy(nights = nights)
+
+            if (nights > 0) {
+                val total = room.pricePerNight * nights * roomCount
+                _uiState.value = _uiState.value.copy(totalPrice = total)
+            }
+        }
+    }
+
+    fun toggleRequest(request: String) {
+        val current = _uiState.value.selectedRequests.toMutableList()
+        if (current.contains(request)) {
+            current.remove(request)
+        } else {
+            current.add(request)
+        }
+        _uiState.value = _uiState.value.copy(selectedRequests = current)
+    }
+
+
+    fun selectCreditCard() {
+        _uiState.value = _uiState.value.copy(paymentOption = PaymentOption.CREDIT_CARD)
+    }
+
+    fun selectCash() {
+        _uiState.value = _uiState.value.copy(paymentOption = PaymentOption.CASH)
+    }
+
+    fun updateCardNumber(number: String) {
+        _uiState.value = _uiState.value.copy(
+            cardNumber = number,
+            cardNumberError = when {
+                number.isEmpty() -> CardFieldError.EMPTY
+                number.length < 16 -> CardFieldError.INVALID_LENGTH
+                else -> CardFieldError.NONE
+            }
+        )
+    }
+
+    fun updateExpMonth(month: String) {
+        _uiState.value = _uiState.value.copy(
+            expMonth = month,
+            expMonthError = when {
+                month.isEmpty() -> CardFieldError.EMPTY
+                month.length < 2 -> CardFieldError.INVALID_LENGTH
+                else -> CardFieldError.NONE
+            }
+        )
+    }
+
+    fun updateExpYear(year: String) {
+        _uiState.value = _uiState.value.copy(
+            expYear = year,
+            expYearError = when {
+                year.isEmpty() -> CardFieldError.EMPTY
+                year.length < 2 -> CardFieldError.INVALID_LENGTH
+                else -> CardFieldError.NONE
+            }
+        )
+    }
+
+    fun updateCvv(cvv: String) {
+        _uiState.value = _uiState.value.copy(
+            cvv = cvv,
+            cvvError = when {
+                cvv.isEmpty() -> CardFieldError.EMPTY
+                cvv.length < 3 -> CardFieldError.INVALID_LENGTH
+                else -> CardFieldError.NONE
+            }
+        )
+    }
+
+    fun canConfirmPayment(): Boolean {
+        return uiState.value.cardNumberError == CardFieldError.NONE &&
+                uiState.value.expMonthError == CardFieldError.NONE &&
+                uiState.value.expYearError == CardFieldError.NONE &&
+                uiState.value.cvvError == CardFieldError.NONE &&
+                uiState.value.cardNumber.isNotEmpty() &&
+                uiState.value.expMonth.isNotEmpty() &&
+                uiState.value.expYear.isNotEmpty() &&
+                uiState.value.cvv.isNotEmpty()
+    }
+
+    fun saveBooking() {
+        val state = _uiState.value
+        _isLoading.value = true
+
+        viewModelScope.launch {
+            val result = bookingUseCase.saveBooking(state)
+            _isLoading.value = false
+
+            if (result) Log.d("BookingVM", "Booking saved successfully")
+            else Log.e("BookingVM", "Failed to save booking")
+        }
+    }
+
+
+    fun loadUserBookings(userEmail: String) {
+        val email = _uiState.value.userEmail ?: return
+        viewModelScope.launch {
+            _isLoading.value = true
+            val bookings = bookingUseCase.getUserBookings(userEmail)
+            _userBookings.value = bookings
+            _isLoading.value = false
+        }
+    }
+
+    fun formatDate(timeMillis: Long?): String {
+        return if (timeMillis != null) {
+            val sdf = SimpleDateFormat("dd MMM yyyy", Locale.getDefault())
+            sdf.format(Date(timeMillis))
+        } else {
+            "N/A"
+        }
+    }
+
+}

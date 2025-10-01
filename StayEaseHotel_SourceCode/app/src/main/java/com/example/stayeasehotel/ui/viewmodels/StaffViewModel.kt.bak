@@ -1,0 +1,247 @@
+package com.example.hotelapp.ui.viewmodel
+
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import com.example.stayeasehotel.model.StaffEntity
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.EmailAuthProvider
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.auth.UserProfileChangeRequest
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.tasks.await
+
+class StaffViewModel : ViewModel() {
+    private val _navigateToStateChoice = MutableStateFlow(false)
+    val navigateToStateChoice: StateFlow<Boolean> = _navigateToStateChoice.asStateFlow()
+
+    private val _staffData = MutableStateFlow<StaffEntity?>(null)
+    val staffData: StateFlow<StaffEntity?> = _staffData.asStateFlow()
+
+    private val _loadingState = MutableStateFlow<LoadingState>(LoadingState.Loading)
+
+    private val auth = FirebaseAuth.getInstance()
+    private val db = FirebaseFirestore.getInstance()
+
+    init {
+        auth.addAuthStateListener { firebaseAuth ->
+            if (firebaseAuth.currentUser == null) {
+                clearStaffData()
+            } else {
+                loadStaffData()
+            }
+        }
+        loadStaffData()
+    }
+
+    fun loadStaffData() {
+        val currentStaff = auth.currentUser
+        if (currentStaff != null) {
+            viewModelScope.launch {
+                try {
+                    _loadingState.value = LoadingState.Loading
+                    val staffDoc = db.collection("Staff").document(currentStaff.uid).get().await()
+
+                    if (staffDoc.exists()) {
+                        val staff = StaffEntity(
+                            staffId = staffDoc.getString("staffId") ?: currentStaff.uid,
+                            name = staffDoc.getString("name") ?: "",
+                            email = staffDoc.getString("email") ?: "",
+                            password = staffDoc.getString("password") ?: "",
+                            phoneNum = staffDoc.getString("phoneNum") ?: "",
+                            gender = staffDoc.getString("gender") ?: "",
+                            position = staffDoc.getString("position") ?: "",
+                            editStaffName = staffDoc.getString("name") ?: "",
+                            editStaffPhoneNum = staffDoc.getString("phoneNum") ?: "",
+                            editStaffCurrentPassword = "",
+                            editStaffNewPassword = "",
+                            editStaffConfirmPassword = "",
+                            editStaffIsLoading = false,
+                            editStaffErrorMessage = null,
+                            editStaffIsSuccess = false
+                        )
+                        _staffData.value = staff
+                        _loadingState.value = LoadingState.Success(staff)
+                    } else {
+                        _loadingState.value = LoadingState.Error("Staff data not found")
+                    }
+                } catch (e: Exception) {
+                    _loadingState.value = LoadingState.Error("Failed to load staff data: ${e.message}")
+                }
+            }
+        } else {
+            _loadingState.value = LoadingState.Error("No staff member logged in")
+        }
+    }
+
+    fun updateEditName(name: String) {
+        _staffData.value = _staffData.value?.copy(editStaffName = name)
+    }
+
+    fun updateEditPhoneNumber(phoneNum: String) {
+        _staffData.value = _staffData.value?.copy(editStaffPhoneNum = phoneNum)
+    }
+
+    fun updateEditCurrentPassword(currentPassword: String) {
+        _staffData.value = _staffData.value?.copy(editStaffCurrentPassword = currentPassword)
+    }
+
+    fun updateEditNewPassword(newPassword: String) {
+        _staffData.value = _staffData.value?.copy(editStaffNewPassword = newPassword)
+    }
+
+    fun updateEditConfirmPassword(confirmPassword: String) {
+        _staffData.value = _staffData.value?.copy(editStaffConfirmPassword = confirmPassword)
+    }
+
+    fun saveStaffChanges() {
+        viewModelScope.launch {
+            val currentStaffData = _staffData.value
+            val currentAuthUser = auth.currentUser
+            val nowPassword = currentStaffData?.password
+
+            if (currentStaffData == null || currentAuthUser == null) {
+                _staffData.value = currentStaffData?.copy(
+                    editStaffErrorMessage = "No staff member logged in",
+                    editStaffIsLoading = false
+                )
+                return@launch
+            }
+
+            _staffData.value = currentStaffData.copy(
+                editStaffIsLoading = true,
+                editStaffErrorMessage = null
+            )
+
+            try {
+                if (currentStaffData.editStaffName.isBlank()) {
+                    _staffData.value = currentStaffData.copy(
+                        editStaffIsLoading = false,
+                        editStaffErrorMessage = "Name cannot be empty"
+                    )
+                    return@launch
+                }
+
+                if (currentStaffData.editStaffPhoneNum != currentStaffData.phoneNum && !currentStaffData.editStaffPhoneNum.matches(Regex("^[0-9]{3}-[0-9]{7,8}$"))) {
+                    _staffData.value = currentStaffData.copy(
+                        editStaffIsLoading = false,
+                        editStaffErrorMessage = "Phone Number must be in format: 000-0000000 or 000-00000000"
+                    )
+                    return@launch
+                }
+
+                val isChangingPassword = currentStaffData.editStaffCurrentPassword.isNotBlank() || currentStaffData.editStaffNewPassword.isNotBlank() ||
+                        currentStaffData.editStaffConfirmPassword.isNotBlank()
+
+                if (isChangingPassword) {
+                    if (currentStaffData.editStaffCurrentPassword != currentStaffData.password) {
+                        _staffData.value = currentStaffData.copy(
+                            editStaffIsLoading = false,
+                            editStaffErrorMessage = "Current password is not your original password"
+                        )
+                        return@launch
+                    }
+
+                    if (currentStaffData.editStaffNewPassword != currentStaffData.editStaffConfirmPassword) {
+                        _staffData.value = currentStaffData.copy(
+                            editStaffIsLoading = false,
+                            editStaffErrorMessage = "New passwords do not match"
+                        )
+                        return@launch
+                    }
+
+                    if (currentStaffData.editStaffNewPassword.length < 6) {
+                        _staffData.value = currentStaffData.copy(
+                            editStaffIsLoading = false,
+                            editStaffErrorMessage = "Password must be at least 6 characters"
+                        )
+                        return@launch
+                    }
+
+                    val credential = EmailAuthProvider.getCredential(
+                        currentAuthUser.email!!,
+                        currentStaffData.editStaffCurrentPassword
+                    )
+                    currentAuthUser.reauthenticate(credential).await()
+
+                    currentAuthUser.updatePassword(currentStaffData.editStaffNewPassword).await()
+                }
+                if (currentStaffData.editStaffNewPassword.isBlank()) {
+                    currentStaffData.editStaffNewPassword = nowPassword.toString()
+                }
+
+                val profileUpdates = UserProfileChangeRequest.Builder()
+                    .setDisplayName(currentStaffData.editStaffName)
+                    .build()
+                currentAuthUser.updateProfile(profileUpdates).await()
+
+                val staffUpdates = hashMapOf<String, Any>(
+                    "name" to currentStaffData.editStaffName,
+                    "phoneNum" to currentStaffData.editStaffPhoneNum,
+                    "password" to currentStaffData.editStaffNewPassword
+                )
+
+                db.collection("Staff").document(currentAuthUser.uid)
+                    .update(staffUpdates as Map<String, Any>)
+                    .await()
+
+                _staffData.value = currentStaffData.copy(
+                    name = currentStaffData.editStaffName,
+                    phoneNum = currentStaffData.editStaffPhoneNum,
+                    password = currentStaffData.editStaffNewPassword,
+                    editStaffIsLoading = false,
+                    editStaffIsSuccess = true,
+                    editStaffErrorMessage = null,
+                    editStaffCurrentPassword = "",
+                    editStaffNewPassword = "",
+                    editStaffConfirmPassword = ""
+                )
+
+            } catch (e: Exception) {
+                _staffData.value = currentStaffData.copy(
+                    editStaffIsLoading = false,
+                    editStaffErrorMessage = when {
+                        e.message?.contains("INVALID_LOGIN_CREDENTIALS") == true ->
+                            "Current password is incorrect"
+                        e.message?.contains("requires recent authentication") == true ->
+                            "Please re-authenticate to change password"
+                        else -> "Failed to update profile: ${e.message}"
+                    }
+                )
+            }
+        }
+    }
+
+    fun clearEditError() {
+        _staffData.value = _staffData.value?.copy(editStaffErrorMessage = null)
+    }
+
+    fun resetEditSuccess() {
+        _staffData.value = _staffData.value?.copy(editStaffIsSuccess = false)
+    }
+
+    fun triggerStateChoiceNavigation() {
+        viewModelScope.launch {
+            _navigateToStateChoice.value = true
+        }
+    }
+
+    fun resetNavigation() {
+        viewModelScope.launch {
+            _navigateToStateChoice.value = false
+        }
+    }
+
+    fun clearStaffData() {
+        _staffData.value = null
+        _loadingState.value = LoadingState.Loading
+    }
+
+    sealed class LoadingState {
+        object Loading : LoadingState()
+        data class Success(val staff: StaffEntity) : LoadingState()
+        data class Error(val message: String) : LoadingState()
+    }
+}
